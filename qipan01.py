@@ -274,7 +274,7 @@ def get_changes(changes):
 
 def map_coordinates(row, col):
     col_mapping = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i']
-    row_mapping = ['9', '8', '7', '6', '5', '4', '3', '2', '1', '0']
+    row_mapping = ['10', '9', '8', '7', '6', '5', '4', '3', '2', '1']
     
     if 0 <= row < len(row_mapping) and 0 <= col < len(col_mapping):
         return col_mapping[col] + row_mapping[row]

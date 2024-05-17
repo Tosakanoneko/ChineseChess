@@ -2,7 +2,7 @@ import cv2
 from qipan01 import *
 from qizi_class import chesspiece
 import time
-
+from ai2 import XiangQiAI
 
 
 if __name__ == '__main__':
@@ -34,6 +34,8 @@ if __name__ == '__main__':
         print_board(start_board)
         print('------------------------------------')
         cv2.imshow('board', render_chess_board(start_board))
+
+    xq_ai = XiangQiAI()
 
     while True:
         ret, frame = cap.read()
@@ -69,7 +71,15 @@ if __name__ == '__main__':
                                     print_board(start_board)
                                     cv2.imshow('board', render_chess_board(start_board))
                                     turn_count += 1
-                                    print("AI_CMD: ", board_to_fen(start_board, next_turn, turn_count, eat_mark, mv_str, 0))
+                                    ai_cmd = board_to_fen(start_board, next_turn, turn_count, eat_mark, mv_str, 0)
+                                    print("AI_CMD: ", ai_cmd)
+                                    xq_ai.add_move(ai_cmd)
+                                    # try:
+                                    xq_ai.receive_output_non_blocking()
+                                    # finally:
+                                    #     # 无论如何都确保关闭引擎
+                                    #     xq_ai.send_command("quit")
+
                                     print('------------------------------------')
                                 last_list = color_cb
                                 count_mark = False
