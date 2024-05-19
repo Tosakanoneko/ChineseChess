@@ -269,7 +269,7 @@ def get_changes(changes):
     else:
         # print(f"chessman move from {former_id} to {current_id}")
         print(f"chessman move from {mapped_former} to {mapped_current}")
-    mv_str = f"{mapped_former[0]}{mapped_former[1]}{mapped_current[0]}{mapped_current[1]}"
+    mv_str = f"{mapped_former}{mapped_current}"
     return former_id, current_id, next_turn, eat_mark, mv_str
 
 def map_coordinates(row, col):
@@ -375,7 +375,7 @@ def render_chess_board(board_state):
                 text_width = text_bbox[2] - text_bbox[0]
                 text_height = text_bbox[3] - text_bbox[1]
                 text_x = center[0] - text_width // 2
-                text_y = (center[1] - text_height // 2) - 3
+                text_y = (center[1] - text_height // 2) - 7
 
                 draw.text((text_x, text_y), chinese_pieces[piece], font=font, fill=color)
 

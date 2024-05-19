@@ -71,7 +71,8 @@ if __name__ == '__main__':
                                     print_board(start_board)
                                     cv2.imshow('board', render_chess_board(start_board))
                                     turn_count += 1
-                                    ai_cmd = board_to_fen(start_board, next_turn, turn_count, eat_mark, mv_str, 0)
+                                    # ai_cmd = board_to_fen(start_board, next_turn, turn_count, eat_mark, mv_str, 0)
+                                    ai_cmd = mv_str
                                     print("AI_CMD: ", ai_cmd)
                                     xq_ai.add_move(ai_cmd)
                                     # try:
