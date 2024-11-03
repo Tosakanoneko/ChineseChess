@@ -37,8 +37,8 @@ def count_red_pixels(img, x, y, radius):
     cv2.circle(mask, (x, y), radius, 255, -1)
     masked = cv2.bitwise_and(img, img, mask=mask)
     # 定义红色的阈值，HSV颜色空间中的红色
-    lower_red = np.array([80, 33, 97])
-    upper_red = np.array([179, 255, 255])
+    lower_red = np.array([124, 0, 133])
+    upper_red = np.array([255, 255, 255])
     # lower_red2 = np.array([170, 120, 70])
     # upper_red2 = np.array([180, 255, 255])
     red_mask = cv2.inRange(cv2.cvtColor(masked, cv2.COLOR_BGR2HSV), lower_red, upper_red)
@@ -62,28 +62,39 @@ def detect_circles(img, param1, param2, minRadius, maxRadius, red_threshold):
                 color = (0, 0, 255)  # 红色
             cv2.circle(img, (x, y), 1, (0, 100, 100), 3)
             cv2.circle(img, (x, y), r, color, 1)
-    cv2.imshow('Detected Circles', img)
+    img = cv2.resize(img, (400, 640))
+    cv2.imshow('frame', img)
     return circles
 
-cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-cv2.namedWindow('Detected Circles')
-cv2.createTrackbar('Param1', 'Detected Circles', 30, 300, lambda x: None)
-cv2.createTrackbar('Param2', 'Detected Circles', 30, 300, lambda x: None)
-cv2.createTrackbar('Min Radius', 'Detected Circles', 17, 30, lambda x: None)
-cv2.createTrackbar('Max Radius', 'Detected Circles', 25, 50, lambda x: None)
-cv2.createTrackbar('Red Threshold', 'Detected Circles', 11, 100, lambda x: None)  # 新增红色像素阈值滑块
+def save_slider_values(param1, param2, minRadius, maxRadius, red_threshold):
+    with open('../chesspiece_config.txt', 'w') as file:
+        file.write(f'{param1},{param2},{minRadius},{maxRadius}, {red_threshold}')
+        print('chesspiece config saved')
+
+cap = cv2.VideoCapture(1, cv2.CAP_DSHOW)
+cap.set(cv2.CAP_PROP_FOURCC,cv2.VideoWriter_fourcc('M','J','P','G'))
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 960)
+cv2.namedWindow('Sliders')
+cv2.createTrackbar('Param1', 'Sliders', 139, 300, lambda x: None)
+cv2.createTrackbar('Param2', 'Sliders', 30, 300, lambda x: None)
+cv2.createTrackbar('Min Radius', 'Sliders', 19, 30, lambda x: None)
+cv2.createTrackbar('Max Radius', 'Sliders', 35, 50, lambda x: None)
+cv2.createTrackbar('Red Threshold', 'Sliders', 50, 100, lambda x: None)  # 新增红色像素阈值滑块
 
 while True:
     ret, frame = cap.read()
+    frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
     if ret:
-        param1 = cv2.getTrackbarPos('Param1', 'Detected Circles')
-        param2 = cv2.getTrackbarPos('Param2', 'Detected Circles')
-        minRadius = cv2.getTrackbarPos('Min Radius', 'Detected Circles')
-        maxRadius = cv2.getTrackbarPos('Max Radius', 'Detected Circles')
-        red_threshold = cv2.getTrackbarPos('Red Threshold', 'Detected Circles')  # 获取红色像素阈值
+        param1 = cv2.getTrackbarPos('Param1', 'Sliders')
+        param2 = cv2.getTrackbarPos('Param2', 'Sliders')
+        minRadius = cv2.getTrackbarPos('Min Radius', 'Sliders')
+        maxRadius = cv2.getTrackbarPos('Max Radius', 'Sliders')
+        red_threshold = cv2.getTrackbarPos('Red Threshold', 'Sliders')  # 获取红色像素阈值
         detect_circles(frame, param1, param2, minRadius, maxRadius, red_threshold)
 
     if cv2.waitKey(1) == ord('q'):
+        save_slider_values(param1, param2, minRadius, maxRadius, red_threshold)
         break
 
 cap.release()

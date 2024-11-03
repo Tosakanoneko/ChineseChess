@@ -5,7 +5,7 @@ import time
 
 class XiangQiAI():
     def __init__(self):
-        engine_path = "./ai/fairy-stockfish-largeboard_x86-64-bmi2.exe"
+        engine_path = "./ai/fstockfishb"
         # 启动象棋引擎
         self.engine = subprocess.Popen(engine_path, universal_newlines=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         # 用于存储棋局的走子
@@ -45,9 +45,10 @@ class XiangQiAI():
             elif output is None:
                 break
             else:
-                print(output)
+                # print(output)
                 if output.startswith("bestmove"):
-                    break
+                    return output
+                
         return False
 
 # 初始化引擎

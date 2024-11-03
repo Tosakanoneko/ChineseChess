@@ -3,6 +3,7 @@
 import cv2
 import numpy as np
 
+
 def nothing(x):
     pass
 
@@ -22,6 +23,7 @@ cv2.namedWindow('Chessboard')
 # cv2.resizeWindow('Chessboard', 480, 640)
 cv2.namedWindow('Threshold')
 cv2.resizeWindow('Threshold', 480, 640)
+
 # radius = 48
 while True:
     # # 读取一帧图像
@@ -53,7 +55,7 @@ while True:
     # # 腐蚀图像
     # eroded_img = cv2.erode(thresh, kernel, iterations=2)
     # dilate_img = cv2.dilate(eroded_img, kernel, iterations=2)
-    
+
 
     # 使用霍夫圆检测
     p_1 = cv2.getTrackbarPos('p_1', 'Trackbars')
@@ -69,6 +71,7 @@ while True:
         for (x, y, r) in circles:
             # 画出圆形
             cv2.circle(frame, (x, y), r, (0, 255, 255), 2)
+            cv2.circle(frame, (x, y), 2, (255, 0, 255), 2)
 
     # 显示原始图像和处理后的图像
     frame = cv2.resize(frame, (480, 640))

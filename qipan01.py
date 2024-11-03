@@ -1,8 +1,8 @@
-import cv2
 import math
 import collections
-import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+import copy
+from chessboard.board_util import *
+from detect_local.detect_rect import classify_piece
 # 创建滑块回调函数
 def nothing(x):
     pass
@@ -15,7 +15,7 @@ class chessboard():
         self.x_pos = 0
         self.y_pos = 0
 
-        self.rows, self.cols, self.depth = 9, 10, 8
+        self.rows, self.cols, self.depth = 9, 10, 4
         self.default_data = {
             'kind': '',
             'color': '',
@@ -34,6 +34,12 @@ class chessboard():
         self.black_stable_result = None
         
         self.mode = 'load'
+
+        self.best_mv_id_former = None
+        self.best_mv_id_after = None
+        self.former_board = []
+        self.best_board_usr = []
+        self.last_best_mv = ''
 
     def init_chessboard(self):
         self.load_slider_values()
@@ -90,8 +96,8 @@ class chessboard():
         min_distance = float('inf')
         closest_point = None
         closest_id = None
-        for i in range(9):  # 水平方向9等分
-            for j in range(10):  # 垂直方向10等分
+        for i in range(self.rows):
+            for j in range(self.cols):
                 distance = math.sqrt((self.points[i][j]['axis'][0] - x) ** 2 + (self.points[i][j]['axis'][1] - y) ** 2)
                 if distance < min_distance:
                     min_distance = distance
@@ -144,6 +150,29 @@ class chessboard():
                             self.points[i][j]['color'] = None
         return frame
     
+    def scan_board(self, frame):
+        detected_board = []
+        for j in range(10):  # 垂直方向10等分
+            row = []
+            for i in range(9):  # 水平方向9等分
+                if self.points[i][j]['color'] is None:
+                    row.append('.')
+                    continue
+                if self.points[i][j]['color'] == 'r':
+                    x = self.red_stable_result[i][j][0]
+                    y = self.red_stable_result[i][j][1]
+                elif self.points[i][j]['color'] == 'b':
+                    x = self.black_stable_result[i][j][0]
+                    y = self.black_stable_result[i][j][1]
+                piece = frame[max(0,y-48):y+48, max(0,x-48):x+48]
+                # cv2.imwrite(f'./testimg/chess_piece{i}{j}.jpg', piece)
+                detect_result = dic_NUM2ENG[classify_piece(piece)]
+                # print(detect_result)
+                row.append(detect_result)
+            detected_board.append(row)
+        return detected_board
+
+
     def upload_stabler(self, points, color):
         '''
         将每次识别的每个位置上的棋子信息上传至稳定器，每7帧进行统计并得出最有可能的结果
@@ -189,18 +218,19 @@ class chessboard():
         return most_common_list
 
     def roi_cut(self,frame):
-        top_left_x = self.x_pos - 40
-        top_left_y = self.y_pos - 60
-        bottom_right_x = self.x_pos + self.width + 40
-        bottom_right_y = self.y_pos + self.height + 60
+        top_left_x = max(0, self.x_pos - 60)
+        top_left_y = max(0, self.y_pos - 60)
+        print(f"width {frame.shape[1]}")
+        bottom_right_x = min(frame.shape[1], self.x_pos + self.width + 60)
+        bottom_right_y = min(frame.shape[0], self.y_pos + self.height + 60)
         roi = frame[top_left_y:bottom_right_y,top_left_x:bottom_right_x]
         return roi
 
     def roi2ori(self, roi_point):
         ori_point = []
         for x, y, r in roi_point:
-            adj_x = x + self.x_pos - 20
-            adj_y = y + self.y_pos - 40
+            adj_x = max(0, x + self.x_pos - 60)
+            adj_y = max(0, y + self.y_pos - 60)
             ori_point.append((adj_x, adj_y, r))
         return ori_point
     
@@ -220,198 +250,86 @@ class chessboard():
             for i in range(self.rows):  # 遍历行
                 cell = self.points[i][j]
                 row.append(cell['color'] if cell['color'] else '.')
-            # print(' '.join(row))
             color_cb.append(row)
-        # for row in color_cb:
-        #     print('  '.join(row))
-        # print('-----------------------------------')
         return color_cb
 
-def find_changes(former, current):
-    changes = []
-    for i in range(len(former)):
-        for j in range(len(former[i])):
-            if former[i][j] != current[i][j]:
-                changes.append(((i, j), former[i][j], current[i][j]))
-    return changes
-
-# 打印变化的函数
-def get_changes(changes):
-    former_id = None
-    current_id = None
-    eat_mark = None
-    for change in changes:
-        (i, j), old, new = change
-        if old == 'r' and new == 'b':
-            current_id = (i, j)
-            eat_mark = 'b'
-            next_turn = 'w'
-        elif old == 'b' and new == 'r':
-            current_id = (i, j)
-            eat_mark = 'r'
-            next_turn = 'b'
-        if old != '.' and new == '.':
-            # print(f"元素 '{old}' 从位置 ({i}, {j}) 移动了")
-            former_id = (i, j)
-        elif old == '.' and new != '.':
-            # print(f"元素 '{new}' 出现在新位置 ({i}, {j})")
-            current_id = (i, j)
-            if new == 'b':
-                next_turn = 'w'
-            else:
-                next_turn = 'b'
-
-    mapped_former = map_coordinates(former_id[0], former_id[1])
-    mapped_current = map_coordinates(current_id[0], current_id[1])
-    if eat_mark:
-        # print(f"chessman {former_id} eat {current_id}")
-        print(f"chessman {mapped_former} eat {mapped_current}")
-    else:
-        # print(f"chessman move from {former_id} to {current_id}")
-        print(f"chessman move from {mapped_former} to {mapped_current}")
-    mv_str = f"{mapped_former}{mapped_current}"
-    return former_id, current_id, next_turn, eat_mark, mv_str
-
-def map_coordinates(row, col):
-    col_mapping = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i']
-    row_mapping = ['10', '9', '8', '7', '6', '5', '4', '3', '2', '1']
+    def gen_best_board_usr(self):
+        # print("-------------移动前-------------")
+        # print_board(self.former_board)
+        # print("-------------移动前-------------")
+        self.best_board_usr = copy.deepcopy(self.former_board)
+        self.best_board_usr[int(self.best_mv_id_after[0])][int(self.best_mv_id_after[1])] = self.best_board_usr[int(self.best_mv_id_former[0])][int(self.best_mv_id_former[1])]
+        self.best_board_usr[int(self.best_mv_id_former[0])][int(self.best_mv_id_former[1])] = '.'
+        # print("-------------best_board_usr-------------")
+        # print_board(self.best_board_usr)
+        # print("-------------best_board_usr-------------")
     
-    if 0 <= row < len(row_mapping) and 0 <= col < len(col_mapping):
-        return col_mapping[col] + row_mapping[row]
-    else:
-        raise ValueError("Invalid row or column index")
-
-def board_to_fen(board, turn, turn_count, eat_mark, mv_str, not_eat = 0):
-    ai_cmd = ''
-    if eat_mark:
-        fen = ""
-        for row in board:
-            empty_count = 0
-            for piece in row:
-                if piece == '.':
-                    empty_count += 1
+    def cvt_pro_mv(self, board, mv_id_former, mv_id_after):
+        y_origin, x_origin = int(mv_id_former[0]), int(mv_id_former[1])
+        print("y_origin: ", y_origin, "x_origin: ", x_origin)
+        y_final, x_final = int(mv_id_after[0]), int(mv_id_after[1])
+        print("y_final: ", y_final, "x_final: ", x_final)
+        chess_word = board[y_final][x_final]
+        chess_name = chinese_pieces[chess_word]
+        chess_color = "red"
+        if chess_word.islower():
+            chess_color = "black"
+        if chess_color == "red":
+            if y_final < y_origin:
+                movement = "进"
+            elif y_final == y_origin:
+                movement = "平"
+            else:
+                movement = "退"
+            x_origin, x_final = axis_convert(chess_color, x_origin, x_final)
+            if chess_word == 'N' or chess_word == 'B' or chess_word == 'A':
+                expression = chess_name + str(x_origin) + movement + str(x_final)
+            else:
+                if movement == "进":
+                    expression = chess_name + str(x_origin) + movement + str(y_origin-y_final)
+                elif movement == "退":
+                    expression = chess_name + str(x_origin) + movement + str(y_final - y_origin)
                 else:
-                    if empty_count > 0:
-                        fen += str(empty_count)
-                        empty_count = 0
-                    fen += piece
-            if empty_count > 0:
-                fen += str(empty_count)
-            fen += "/"
-        fen = fen[:-1]
-        fen += f' {turn} - - {not_eat} {turn_count}'
-        ai_cmd = fen
-    else:
-        ai_cmd = mv_str
-    return ai_cmd
+                    expression = chess_name + str(x_origin) + movement + str(x_final)
+            return expression
+        if chess_color == "black":
+            if y_final > y_origin:
+                movement = "进"
+            elif y_final == y_origin:
+                movement = "平"
+            else:
+                movement = "退"
+            x_origin, x_final = axis_convert(chess_color, x_origin, x_final)
+            if chess_word == 'n' or chess_word == 'b' or chess_word == 'a':
+                expression = chess_name + str(x_origin) + movement + str(x_final)
+            else:
+                if movement == "进":
+                    expression = chess_name + str(x_origin) + movement + str(y_final - y_origin)
+                elif movement == "退":
+                    expression = chess_name + str(x_origin) + movement + str(y_origin - y_final)
+                else:
+                    expression = chess_name + str(x_origin) + movement + str(x_final)
+            return expression
+  
 
-def print_board(board):
-    for row in board:
-        print('  '.join(row))
-
-def render_chess_board(board_state):
-    # 定义颜色
-    colors = {
-        'r': (0, 0, 0), 'n': (0, 0, 0), 'b': (0, 0, 0), 'a': (0, 0, 0), 'k': (0, 0, 0), 'c': (0, 0, 0), 'p': (0, 0, 0),
-        'R': (0, 0, 255), 'N': (0, 0, 255), 'B': (0, 0, 255), 'A': (0, 0, 255), 'K': (0, 0, 255), 'C': (0, 0, 255), 'P': (0, 0, 255)
-    }
-
-    # 定义棋子的中文字符
-    chinese_pieces = {
-        'r': '車', 'n': '馬', 'b': '象', 'a': '士', 'k': '将', 'c': '炮', 'p': '卒',
-        'R': '車', 'N': '馬', 'B': '相', 'A': '仕', 'K': '帅', 'C': '炮', 'P': '兵'
-    }
-
-    # 定义棋盘大小
-    rows, cols = 10, 9
-    square_size = 60
-    width, height = cols * square_size - square_size, rows * square_size - square_size
-
-    # 创建带有边框的空白图像
-    border_size = square_size
-    board = np.ones((height + 2 * border_size, width + 2 * border_size, 3), dtype=np.uint8) * np.array([113, 170, 207], dtype=np.uint8)
-
-    # 绘制棋盘网格线
-    for i in range(rows):
-        cv2.line(board, (border_size, i * square_size + border_size), (width + border_size, i * square_size + border_size), (0, 0, 0), 1)
-    for j in range(cols):
-        # 跳过第5和第6行之间区域的第2到第8列的列线
-        if j in range(1, 8):
-            cv2.line(board, (j * square_size + border_size, border_size), (j * square_size + border_size, 4 * square_size + border_size), (0, 0, 0), 1)
-            cv2.line(board, (j * square_size + border_size, 5 * square_size + border_size), (j * square_size + border_size, height + border_size), (0, 0, 0), 1)
-        else:
-            cv2.line(board, (j * square_size + border_size, border_size), (j * square_size + border_size, height + border_size), (0, 0, 0), 1)
-
-    # 绘制九宫格对角线
-    cv2.line(board, (3 * square_size + border_size, border_size), (5 * square_size + border_size, 2 * square_size + border_size), (0, 0, 0), 1)
-    cv2.line(board, (5 * square_size + border_size, border_size), (3 * square_size + border_size, 2 * square_size + border_size), (0, 0, 0), 1)
-    cv2.line(board, (3 * square_size + border_size, 7 * square_size + border_size), (5 * square_size + border_size, 9 * square_size + border_size), (0, 0, 0), 1)
-    cv2.line(board, (5 * square_size + border_size, 7 * square_size + border_size), (3 * square_size + border_size, 9 * square_size + border_size), (0, 0, 0), 1)
-
-    # 绘制圆环和覆盖棋盘线条的圆
-    for i in range(rows):
-        for j in range(cols):
-            piece = board_state[i][j]
-            if piece != '.':
-                center = (j * square_size + border_size, i * square_size + border_size)
-                color = colors[piece]
-                # 在圆内部覆盖棋盘线条
-                cv2.circle(board, center, square_size // 2 - 5, (155, 189, 212), -1)
-                # 绘制圆环
-                cv2.circle(board, center, square_size // 2 - 5, color, 2)
-
-    # 使用PIL来绘制汉字
-    pil_img = Image.fromarray(board)
-    draw = ImageDraw.Draw(pil_img)
-    font = ImageFont.truetype("./font/SIMLI.TTF", 34)  # 使用黑体字体，字体大小40
-
-    for i in range(rows):
-        for j in range(cols):
-            piece = board_state[i][j]
-            if piece != '.':
-                center = (j * square_size + border_size, i * square_size + border_size)
-                color = colors[piece]
-                text_bbox = draw.textbbox((0, 0), chinese_pieces[piece], font=font)
-                text_width = text_bbox[2] - text_bbox[0]
-                text_height = text_bbox[3] - text_bbox[1]
-                text_x = center[0] - text_width // 2
-                text_y = (center[1] - text_height // 2) - 7
-
-                draw.text((text_x, text_y), chinese_pieces[piece], font=font, fill=color)
-
-    # 在第5行（索引为4）和第6行（索引为5）之间的第2、3列，第3、4列，第6、7列，第7、8列中分别绘制“楚”，“河”，“汉”，“界”
-    chu_he_han_jie = ["楚", "河", "汉", "界"]
-    positions = [(2, 4), (3, 4), (6, 4), (7, 4)]  # (col, row) 位置
-
-    for (col, row), text in zip(positions, chu_he_han_jie):
-        text_bbox = draw.textbbox((0, 0), text, font=font)
-        text_width = text_bbox[2] - text_bbox[0]
-        text_height = text_bbox[3] - text_bbox[1]
-        text_x = (col * square_size + border_size - text_width // 2) - (border_size // 2)
-        text_y = (row * square_size + border_size + (square_size - text_height) // 2) - 5
-        draw.text((text_x, text_y), text, font=font, fill=(0, 0, 0))
-
-    # 转换回OpenCV图像
-    board = np.array(pil_img)
-
-    return board
-
-start_board = [
-    ['r', 'n', 'b', 'a', 'k', 'a', 'b', 'n', 'r'],
-    ['.', '.', '.', '.', '.', '.', '.', '.', '.'],
-    ['.', 'c', '.', '.', '.', '.', '.', 'c', '.'],
-    ['p', '.', 'p', '.', 'p', '.', 'p', '.', 'p'],
-    ['.', '.', '.', '.', '.', '.', '.', '.', '.'],
-    ['.', '.', '.', '.', '.', '.', '.', '.', '.'],
-    ['P', '.', 'P', '.', 'P', '.', 'P', '.', 'P'],
-    ['.', 'C', '.', '.', '.', '.', '.', 'C', '.'],
-    ['.', '.', '.', '.', '.', '.', '.', '.', '.'],
-    ['R', 'N', 'B', 'A', 'K', 'A', 'B', 'N', 'R']
-]
+# dic_NUM2ENG = {
+#     0: 'p', 
+#     1: 'a', 
+#     2: 'b', 
+#     3: 'k', 
+#     4: 'r', 
+#     5: 'n', 
+#     6: 'c', 
+#     7: 'A', 
+#     8: 'B', 
+#     9: 'K', 
+#     10: 'P'
+# }
 
 if __name__ == '__main__':
     # 初始化摄像头
-    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
+    cap.set(cv2.CAP_PROP_FOURCC,cv2.VideoWriter_fourcc('M','J','P','G'))
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 960)
 
@@ -440,13 +358,9 @@ if __name__ == '__main__':
         frame = cv2.resize(frame, (480, 640))
         cv2.imshow('Chessboard Detector', frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
-            # axis = cb.points[3][3]['axis']
-            # print("axis:", axis) #(296,239)
-            # cv2.circle(frame, (int(axis[0]/2), int(axis[1]/2)), 2, (0, 255, 0), -1)
-            
-            # cv2.imshow('Chessboard Detector', frame)
-            # cv2.waitKey(0)
             break
+        elif cv2.waitKey(1) & 0xFF == ord('s'):
+            cb.scan_board(frame)
 
     cb.save_slider_values()
     cap.release()

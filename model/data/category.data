@@ -1,0 +1,22 @@
+[name]
+model_name=hand
+
+[train-configure]
+epochs=300
+steps=150,250
+batch_size=16
+subdivisions=1
+learning_rate=0.001
+
+[model-configure]
+pre_weights=None
+classes=1
+width=352
+height=352
+anchor_num=3
+anchors=4.89,9.50, 8.56,12.38, 17.31,22.65, 30.68,35.67, 51.91,56.16, 87.27,101.31
+
+[data-configure]
+train=D:/hand_dataset/dataset/train.txt
+val=D:/hand_dataset/dataset/val.txt 
+names=E:/qianrushi/Yolo-FastestV2/data/data6/category.names
