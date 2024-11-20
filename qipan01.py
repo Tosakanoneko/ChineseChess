@@ -15,7 +15,7 @@ class chessboard():
         self.x_pos = 0
         self.y_pos = 0
 
-        self.rows, self.cols, self.depth = 9, 10, 4
+        self.rows, self.cols, self.depth = 9, 10, 8
         self.default_data = {
             'kind': '',
             'color': '',

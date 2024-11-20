@@ -18,7 +18,7 @@ class Manipulator:
         self.MovedCp_theta2 = 0
 
         self.ser = serial.Serial(
-            port="/dev/ttyS1", 
+            port="/dev/ttyAMA2", 
             baudrate=9600,
             timeout = 0.01
         )
@@ -167,8 +167,8 @@ class Manipulator:
 if __name__ == '__main__':
     # 66 56s
     jxb = Manipulator()
-
-    jxb.send_cmd(0,[2,2],[0,1])
+    # jxb.send_cmd(0,[2,2],[0,1])
+    jxb.send_cmd(0,[5,0],[4,0])
     # theta1 = round(theta1, 6)
     # theta2 = round(theta2, 6)
     # theta1 = 58
